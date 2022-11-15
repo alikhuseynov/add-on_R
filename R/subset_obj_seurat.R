@@ -7,10 +7,12 @@ NULL
 
 #' Function params/args:
 #' @param object An S4 object
+#' @param subset Logical expression indicating features/variables to keep
 #' @param cells A vector of cells to keep; if \code{NULL}, defaults to all cells
-#' @param update.slots If to update slots of an object
 #' @param idents A vector of identity classes to keep
+#' @param update.slots If to update slots of an object
 #' @param ... Arguments passed to \code{subset()} and other methods
+
 
 subset_opt <- 
 function (object = NULL, subset, 
