@@ -3,7 +3,7 @@ NULL
 
 #' Intermediate solution to \code{subset()}:
 #' subset FOVs/centroids if selected cells are NOT found in each FOV
-#' NOTE: some code parts and args are takes from SeuratObject
+#' NOTE: some code parts and args are taken from SeuratObject
 
 #' Function params/args:
 #' @param object An S4 object
@@ -29,18 +29,27 @@ if (update.slots) {
 message("Cloing object..")
 obj_subset <- object
 
-if (!missing(x = subset)) {
+if (!missing(subset) || !is.null(idents)) {
+    message("Extracting cells matched to `subset` and/or `idents`")
+}
+     
+if (!missing(subset)) {
     subset <- enquo(arg = subset)
     # cells to keep in the object
-    message("Extracting cells matched to `subset`, `idents`")
     cells <-
     WhichCells(object = obj_subset, 
                cells = cells,
-               idents = idents, 
-               expression = subset, 
+               idents = idents,
+               expression = subset,
+               return.null = TRUE, ...)
+} else if (!is.null(idents)) {
+    cells <-
+    WhichCells(object = obj_subset, 
+               cells = cells,
+               idents = idents,
                return.null = TRUE, ...)
 }
-    
+
 # check if cells are present in all FOV
 message("Matching cells in FOVs..")
 cells_check <-
@@ -48,29 +57,30 @@ lapply(Images(obj_subset) %>% seq,
        function(i) { 
            any(obj_subset[[Images(obj_subset)[i]]][["centroids"]] %>% Cells %in% cells) 
        }) %>% unlist
+
 if (all(cells_check)) { 
     message("Cell subsets are found in all FOVs!", "\n",
             "Subsetting object..") 
-    obj_subset %<>% base::subset(cells = cells, ...)
-}
+    obj_subset %<>% base::subset(cells = cells, idents = idents, ...)
+} else { 
+    # if cells are present only in one or several FOVs:
+    # subset FOVs
+    fovs <- 
+    lapply(Images(obj_subset) %>% seq, function(i) {
+        if (any(obj_subset[[Images(obj_subset)[i]]][["centroids"]] %>% Cells %in% cells)) {
+            message("Cell subsets are found only in FOV: ", "\n", Images(obj_subset)[i])
+            message("Subsetting Centroids..")
+            base::subset(x = obj_subset[[Images(obj_subset)[i]]], cells = cells, idents = idents, ...)
+        }
+          }) 
+    # replace subsetted FOVs, and remove FOVs with no matching cells
+    message("Removing FOVs where cells are NOT found: ", "\n", 
+            paste0(Images(object)[which(!cells_check == TRUE)], "\n"), "\n",
+            "Subsetting cells..")
+    for (i in fovs %>% seq) { obj_subset[[Images(object)[i]]] <- fovs[[i]] }  
 
-# if cells are present only in one or several FOVs:
-# subset FOVs
-fovs <- 
-lapply(Images(obj_subset) %>% seq, function(i) {
-    if (any(obj_subset[[Images(obj_subset)[i]]][["centroids"]] %>% Cells %in% cells)) {
-        message("Cell subsets are found only in FOV: ", "\n", Images(obj_subset)[i])
-        message("Subsetting Centroids..")
-        base::subset(x = obj_subset[[Images(obj_subset)[i]]], cells = cells)
 }
-})
     
-# replace subsetted FOVs, and remove FOVs with no matching cells
-message("removing FOVs in which no cells are found: ", "\n", 
-        paste0(Images(object)[which(!cells_check == TRUE)], "\n"), "\n",
-        "Subsetting cells..")
-for (i in fovs %>% seq) { obj_subset[[Images(object)[i]]] <- fovs[[i]] }  
-
 # subset final object
 obj_subset %<>% base::subset(cells = cells, ...)
     
