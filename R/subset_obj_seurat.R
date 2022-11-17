@@ -23,12 +23,17 @@ function (object = NULL, subset,
 
 if (update.slots) { 
     message("Updating object slots..")
-    object <- UpdateSlots(object = object) 
+    object <- UpdateSlots(object = object)
 }
 
 message("Cloing object..")
 obj_subset <- object
 
+# sanity check - use only cell ids (no indices)
+if (all(is.integer(cells))) { 
+    cells <- Cells(obj_subset)[cells]
+}
+    
 if (!missing(subset) || !is.null(idents)) {
     message("Extracting cells matched to `subset` and/or `idents`")
 }
