@@ -1,2 +1,2 @@
-# add-on_R
-Add-on functions for various R packages
+## Add-on repo for optimized R functions from various R packages
+### to-be-filled later..
