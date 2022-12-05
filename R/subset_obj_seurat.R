@@ -6,24 +6,27 @@ NULL
 #' NOTE: some code parts and args are taken from SeuratObject
 
 #' Function params/args:
-#' @param object An S4 object
+#' @param object An S4 object or A \code{FOV} object
 #' @param subset Logical expression indicating features/variables to keep
 #' @param cells A vector of cells to keep; if \code{NULL}, defaults to all cells
 #' @param idents A vector of identity classes to keep
-#' @param update.slots If to update slots of an object
+#' @param Update.slots If to update slots of an object
+#' @param Update.object If to update final object
 #' @param ... Arguments passed to \code{subset()} and other methods
 
 
 subset_opt <- 
 function (object = NULL, subset, 
           cells = NULL, idents = NULL, 
-          update.slots = FALSE, ...)
+          Update.slots = TRUE,
+          Update.object = TRUE,
+          ...)
 
 {
 
-if (update.slots) { 
+if (Update.slots) { 
     message("Updating object slots..")
-    object <- UpdateSlots(object = object)
+    object %<>% UpdateSlots()
 }
 
 message("Cloing object..")
@@ -37,8 +40,11 @@ if (all(is.integer(cells))) {
 if (!missing(subset) || !is.null(idents)) {
     message("Extracting cells matched to `subset` and/or `idents`")
 }
-     
-if (!missing(subset)) {
+
+if (class(obj_subset) == "FOV") {
+    message("object class is `FOV` ")
+    cells <- Cells(obj_subset)
+} else if (!class(obj_subset) == "FOV" && !missing(subset)) {
     subset <- enquo(arg = subset)
     # cells to keep in the object
     cells <-
@@ -47,25 +53,33 @@ if (!missing(subset)) {
                idents = idents,
                expression = subset,
                return.null = TRUE, ...)
-} else if (!is.null(idents)) {
+} else if (!class(obj_subset) == "FOV" && !is.null(idents)) {
     cells <-
     WhichCells(object = obj_subset, 
                cells = cells,
                idents = idents,
                return.null = TRUE, ...)
+} else if (is.null(cells)) {
+    cells <- Cells(obj_subset)
 }
 
-# check if cells are present in all FOV
-message("Matching cells in FOVs..")
-cells_check <-
-lapply(Images(obj_subset) %>% seq, 
-       function(i) { 
-           any(obj_subset[[Images(obj_subset)[i]]][["centroids"]] %>% Cells %in% cells) 
-       }) %>% unlist
+# added support for object class `FOV`
+if (class(obj_subset) == "FOV") {
+    message("Matching cells for object class `FOV`..")
+    cells_check <- any(obj_subset %>% Cells %in% cells)
+} else { 
+    # check if cells are present in all FOV
+    message("Matching cells in FOVs..")
+    cells_check <-
+    lapply(Images(obj_subset) %>% seq, 
+           function(i) { 
+               any(obj_subset[[Images(obj_subset)[i]]][["centroids"]] %>% Cells %in% cells) 
+           }) %>% unlist
+}
 
 if (all(cells_check)) { 
     message("Cell subsets are found in all FOVs!", "\n",
-            "Subsetting object..") 
+            "Subsetting object..")
     obj_subset %<>% base::subset(cells = cells, idents = idents, ...)
 } else { 
     # if cells are present only in one or several FOVs:
@@ -89,6 +103,9 @@ if (all(cells_check)) {
 # subset final object
 obj_subset %<>% base::subset(cells = cells, ...)
     
-UpdateSeuratObject(obj_subset)
+if (Update.object && !class(obj_subset) == "FOV") { 
+    message("Updating object..")
+    obj_subset %<>% UpdateSeuratObject() }
+    
 return(obj_subset)
 }
