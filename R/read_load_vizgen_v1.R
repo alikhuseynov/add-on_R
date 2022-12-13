@@ -7,10 +7,12 @@ NULL
 #' New arguments:
 #' @param use.parallel If to use \code{parallel::mclapply()}, default is \code{TRUE}, if \code{FALSE}, uses \code{future} library
 #' @param mc.cores.total Number of cores to use for \code{parallel::mclapply()}, check cores with \code{parallel::detectCores()}
+#' @param mc.cores.portion Denominator for \code{mc.cores.total}, ie \code{mc.cores.total / mc.cores.portion} used for faster extraction of cell boundaries per cell..
 #' @param DTthreads.pct Set percentage eg \code{50} of total threads to use for \code{data.table::fread}, if set to \code{NULL} will use default setting as in \code{data.table::getDTthreads(verbose = T)}
 #' @param mol.type.use In which space to use molecules coords: "microns" or "pixels". Default to "microns". This arg is for creating an object \code{LoadVizgen_opt()}
 #' @param coord.space = "micron" Which coordinate space to use: "microns" or "mosaic" (pixel space). Default to "microns"
 #' @param use.cellpose.out If TRUE, and ./Cellpose folder exists, will load results from current MERSCOPE Instrument output. Default to TRUE. Set to FALSE if to use previous outputs (ie. non-Cellpose).
+#' @param Update.object If to update final object, default to TRUE.
 #' @param ... Arguments passed to \code{ReadVizgen_opt()}
 
 
@@ -20,13 +22,13 @@ NULL
 
 #==========================================================================
 ReadVizgen_opt <-
-  function (data.dir, transcripts = NULL, spatial = NULL, molecules = NULL, type = "segmentations",
-            use.cellpose.out = TRUE, mol.type = "microns", coord.space = "micron",
-            metadata = NULL, filter = NA_character_ , z = 3L, use.parallel = TRUE,
-            mc.cores.total = 12, DTthreads.pct = data.table::getDTthreads(verbose = F)
+  function (data.dir, transcripts = NULL, spatial = NULL, molecules = NULL, type = "segmentations", 
+            use.cellpose.out = TRUE, mol.type = "microns", coord.space = "micron", 
+            metadata = NULL, filter = NA_character_ , z = 3L, use.parallel = TRUE, 
+            mc.cores.total = 12, mc.cores.portion = 2, DTthreads.pct = data.table::getDTthreads(verbose = F)
   )
     
-  {
+  {   
     if (!requireNamespace("data.table", quietly = TRUE)) {
       stop("Please install 'data.table' for this function")
     }
@@ -38,10 +40,10 @@ ReadVizgen_opt <-
     # setting cores to use for parallel computing - `parallel`
     if (use.parallel) {
       message("Using parallelization with: `parallel`")
-      if (is.null(mc.cores.total)) {
+      if (is.null(mc.cores.total)) { 
         mc.cores.total <- quantile(parallel::detectCores() %>% seq)[4] %>% round
         message(mc.cores.total, " of total cores available will be used")
-      } else { message("Setting total cores to: ", mc.cores.total) }
+      } else { message("Setting total cores to: ", mc.cores.total) }   
     } else { message("Using parallelization with: `future`") }
     
     
@@ -84,7 +86,7 @@ ReadVizgen_opt <-
       files <- c(transcripts = transcripts %||% "./Cellpose/cellpose_cell_by_gene.csv",
                  spatial = spatial %||% "./Cellpose/cellpose_cell_metadata.csv",
                  molecules = molecules %||% "detected_transcripts[_a-zA-Z0-9]*.csv")
-    } else {
+    } else { 
       files <- c(transcripts = transcripts %||% "cell_by_gene[_a-zA-Z0-9]*.csv",
                  spatial = spatial %||% "cell_metadata[_a-zA-Z0-9]*.csv",
                  molecules = molecules %||% "detected_transcripts[_a-zA-Z0-9]*.csv")
@@ -130,15 +132,15 @@ ReadVizgen_opt <-
           warning("Cannot find cell boundary H5 files",
                   immediate. = TRUE)
           FALSE
-        }
+        } 
         else if (use.cellpose.out) { # added for Cellpose output
           files2scan <-
-            list.files(data.dir, pattern = ".parquet$",
-                       all.files = TRUE,
-                       full.names = TRUE,
+            list.files(data.dir, pattern = ".parquet$", 
+                       all.files = TRUE, 
+                       full.names = TRUE, 
                        recursive = TRUE)
-          if (length(files2scan)) {
-            message("Cell segmentations are found in `.parquet` file(s)", "\n",
+          if (length(files2scan)) { 
+            message("Cell segmentations are found in `.parquet` file(s)", "\n", 
                     "..using ", coord.space, " space coordiates")
           }
           TRUE
@@ -190,8 +192,8 @@ ReadVizgen_opt <-
     gc() %>% invisible() # collect garbage
     
     for (otype in names(x = outs)) {
-      outs[[otype]] <-
-        switch(EXPR = otype,
+      outs[[otype]] <- 
+        switch(EXPR = otype, 
                transcripts = {
                  ptx <- progressor()
                  ptx(message = "Reading counts matrix", class = "sticky",
@@ -226,15 +228,15 @@ ReadVizgen_opt <-
                    
                    # use Cellpose segmentations
                    }, segmentations = {
-                     if (use.cellpose.out) {
+                     if (use.cellpose.out) { 
                        files2scan <-
-                         list.files(data.dir, pattern = ".parquet$",
-                                    all.files = TRUE,
-                                    full.names = TRUE,
+                         list.files(data.dir, pattern = ".parquet$", 
+                                    all.files = TRUE, 
+                                    full.names = TRUE, 
                                     recursive = TRUE)
                        if (length(files2scan)) {
                          file2read <- files2scan %>%
-                           grep(coord.space, ., value = TRUE) %>%
+                           grep(coord.space, ., value = TRUE) %>% 
                            grep(".parquet$", ., value = TRUE)
                        }
                        
@@ -244,46 +246,47 @@ ReadVizgen_opt <-
                        # get all cell segmentations
                        segs <- filter(parq, ZIndex == z) %>% pull(Geometry)
                        # check if any cells have > 1 segmentation boundary
-                       test.segs <-
+                       test.segs <- 
                          lapply(segs %>% seq, function(i) segs[[i]][[1]] %>% length)
                        if (which(unlist(test.segs) > 1) %>% any) {
                          segs.art.index <- which(unlist(test.segs) > 1)
-                         message(segs.art.index %>% length,
+                         message(segs.art.index %>% length, 
                                  " Cells have > 1 segmentaion boundary artifacts", "\n",
                                  "..removing artifacts", "\n",
                                  "..keeping cell boundaries with maximum coords")
                          # usually artifacts have small boundaries/coords
                          # find cell boundaries with maximum coords
-                         for (i in segs.art.index %>% seq) {
-                           dims <- lapply(segs[[segs.art.index[i]]][[1]] %>% seq(),
+                         for (i in segs.art.index %>% seq) { 
+                           dims <- lapply(segs[[segs.art.index[i]]][[1]] %>% seq(), 
                                           function(d) { dim(segs[[segs.art.index[i]]][[1]][[d]])[1] } )
                            # get & keep boundaries with maximum coords
-                           maxs.segs <- which(unlist(dims) == max(unlist(dims)))
+                           maxs.segs <- which(unlist(dims) == max(unlist(dims)))  
                            segs[[segs.art.index[i]]][[1]] <- segs[[segs.art.index[i]]][[1]][maxs.segs]
                          }
                        } else { message("All cells have 1 segmentaion boundary (no artifacts)") }
-                       # add cell names
-                       names(segs) <- filter(parq, ZIndex == z) %>% pull(EntityID) %>% as.character
+                       # add cell names 
+                       names(segs) <- filter(parq, ZIndex == z) %>% pull(EntityID) %>% as.character       
                        # extract cell boundaries per cells
                        segs_list <-
-                         mclapply(segs %>% seq,
-                                  function(i) {
-                                    segs[[i]][[1]] %>%
-                                      as.data.frame.list %>%
-                                      mutate(cell = names(segs)[i]) },
-                                  mc.cores = round(mc.cores.total / 3) # use some portion of total mc.cores
+                         mclapply(segs %>% seq,  
+                                  function(i) { 
+                                    segs[[i]][[1]] %>% 
+                                      as.data.frame.list %>% 
+                                      mutate(cell = names(segs)[i]) }, 
+                                  mc.cores = round(mc.cores.total / mc.cores.portion) # use some portion of total mc.cores
                          )
                        #segs_list %>% length
                        # df of all cell segmentations
                        segs <- do.call("rbind", segs_list)
-                       names(segs)[1:2] <- c("x", "y")
-                       segs
+                       names(segs)[1:2] <- c("x", "y") 
+                       message("All cell boundaries (with no artifacts) are loaded..")        
+                       segs 
                      } else { # use non-Cellpose segmentations
                        ppoly <- progressor(steps = length(x = unique(x = sp$fov)))
                        ppoly(message = "Creating polygon coordinates", class = "sticky",
                              amount = 0)
                        # use parallel or future
-                       if (use.parallel) {
+                       if (use.parallel) { 
                          pg <- parallel::mclapply(X = unique(x = sp$fov), FUN = function(f, ...) {
                            fname <- file.path(h5dir, paste0("feature_data_", f, ".hdf5"))
                            if (!file.exists(fname)) {
@@ -292,11 +295,11 @@ ReadVizgen_opt <-
                              return(NULL)
                            }
                            # reading hdf5 files
-                           hfile <- hdf5r::H5File$new(filename = fname,
+                           hfile <- hdf5r::H5File$new(filename = fname, 
                                                       mode = "r")
                            on.exit(expr = hfile$close_all())
-                           cells <- rownames(x = subset(x = sp, subset = fov == f))
-                           # creating df for cell boundaries
+                           cells <- rownames(x = subset(x = sp, subset = fov == f))     
+                           # creating df for cell boundaries     
                            df <- parallel::mclapply(X = cells, FUN = function(x) {
                              return(tryCatch(expr = {
                                cc <- hfile[["featuredata"]][[x]][[zidx]][["p_0"]][["coordinates"]]$read()
@@ -307,13 +310,13 @@ ReadVizgen_opt <-
                              }, error = function(...) {
                                return(NULL)
                              }))
-                           }, mc.cores = mc.cores.total)
+                           }, mc.cores = mc.cores.total)    
                            ppoly()
                            return(do.call(what = "rbind", args = df))
                          }, mc.cores = mc.cores.total)
-                       } else {
-                         pg <-
-                           future.apply::future_lapply(X = unique(x = sp$fov),
+                       } else { 
+                         pg <- 
+                           future.apply::future_lapply(X = unique(x = sp$fov), 
                                                        FUN = function(f, ...) {
                                                          fname <- file.path(h5dir, paste0("feature_data_",
                                                                                           f, ".hdf5"))
@@ -413,8 +416,8 @@ ReadVizgen_opt <-
   }
 
 #==========================================================================
-LoadVizgen_opt <-
-  function (data.dir, fov = "vz", assay = "Vizgen",
+LoadVizgen_opt <- 
+  function (data.dir, fov = "vz", assay = "Vizgen", Update.object = TRUE,
             ...)
   {
     data <- ReadVizgen_opt(data.dir = data.dir, ...)
@@ -427,7 +430,7 @@ LoadVizgen_opt <-
       coords <- CreateFOV(coords = bound.boxes.data, type = c("boxes",
                                                               "centroids"), molecules = data[[mol.type]], assay = assay)
       obj <- CreateSeuratObject(counts = data[["transcripts"]], assay = assay)
-      coords <- subset(x = coords,
+      coords <- subset(x = coords, 
                        cells = intersect(x = Cells(x = coords[["boxes"]]),
                                          y = Cells(x = obj)))
     } else {
@@ -439,7 +442,7 @@ LoadVizgen_opt <-
       obj <- CreateSeuratObject(counts = data[["transcripts"]], assay = assay)
       coords <- subset(x = coords,
                        cells = intersect(x = Cells(x = coords[["segmentation"]]),
-                                         y = Cells(x = obj)))
+                                         y = Cells(x = obj)))    
     }
     
     # add metadata vars
@@ -447,18 +450,24 @@ LoadVizgen_opt <-
       metadata <- match.arg(arg = "metadata", choices = names(data), several.ok = TRUE)
       meta.vars <- names(data[[metadata]])
       for (i in meta.vars %>% seq) {
-        obj %<>% AddMetaData(metadata = data[[metadata]][[meta.vars[i]]],
+        obj %<>% AddMetaData(metadata = data[[metadata]][[meta.vars[i]]], 
                              col.name = meta.vars[i])
       }
     }
     
     # sanity on fov name
-    fov %<>% gsub("_|-", ".", .)
+    fov %<>% gsub("_|-", ".", .) 
       
     obj[[fov]] <- coords
+      
+    if (Update.object) { 
+        message("Updating object..")
+        obj %<>% UpdateSeuratObject() }  
+      
+    message("FOV is added..", "\n", 
+            "Object is ready!") 
     return(obj)
     
     gc() %>% invisible()
   }
-
 
