@@ -11,7 +11,7 @@ NULL
 #' @param cells A vector of cells to keep; if \code{NULL}, defaults to all cells
 #' @param idents A vector of identity classes to keep
 #' @param Update.slots If to update slots of an object
-#' @param Update.object If to update final object
+#' @param Update.object If to update final object, default to TRUE.
 #' @param ... Arguments passed to \code{subset()} and other methods
 
 
@@ -106,6 +106,8 @@ obj_subset %<>% base::subset(cells = cells, ...)
 if (Update.object && !class(obj_subset) == "FOV") { 
     message("Updating object..")
     obj_subset %<>% UpdateSeuratObject() }
-    
+
+message("Object is ready!")
 return(obj_subset)
+    
 }
