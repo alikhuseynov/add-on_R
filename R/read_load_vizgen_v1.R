@@ -12,6 +12,7 @@ NULL
 #' @param mol.type.use In which space to use molecules coords: "microns" or "pixels". Default to "microns". This arg is for creating an object \code{LoadVizgen_opt()}
 #' @param coord.space = "micron" Which coordinate space to use: "microns" or "mosaic" (pixel space). Default to "microns"
 #' @param use.cellpose.out If TRUE, and ./Cellpose folder exists, will load results from current MERSCOPE Instrument output. Default to TRUE. Set to FALSE if to use previous outputs (ie. non-Cellpose).
+#' @param add.zIndex If to add \code{z} slice index to a cell
 #' @param Update.object If to update final object, default to TRUE.
 #' @param ... Arguments passed to \code{ReadVizgen_opt()}
 
@@ -66,8 +67,8 @@ ReadVizgen_opt <-
     mol.type <- match.arg(arg = mol.type, choices = c("pixels",
                                                       "microns"), several.ok = TRUE)
     if (!is.null(x = metadata)) {
-      metadata <- match.arg(arg = metadata, choices = c("volume",
-                                                        "fov"), several.ok = TRUE)
+      metadata <- match.arg(arg = metadata, 
+                            choices = c("volume", "fov"), several.ok = TRUE)
     }
     if (!z %in% seq.int(from = 0L, to = 6L)) {
       stop("The z-index must be in the range [0, 6]")
@@ -266,6 +267,8 @@ ReadVizgen_opt <-
                        } else { message("All cells have 1 segmentaion boundary (no artifacts)") }
                        # add cell names 
                        names(segs) <- filter(parq, ZIndex == z) %>% pull(EntityID) %>% as.character       
+                       
+                       # TODO: (optionally) resample & make cell boundaries equidistant!
                        # extract cell boundaries per cells
                        segs_list <-
                          mclapply(segs %>% seq,  
@@ -410,6 +413,10 @@ ReadVizgen_opt <-
                              df
                            }, stop("Unknown MERFISH input type: ", type))
       }
+    
+    # add z-slice index for cells
+    outs$zIndex <- data.frame(z = rep_len(z, length.out = outs$centroids$cell %>% length), cell = outs$centroids$cell)
+    
     return(outs)
     gc() %>% invisible()
     
@@ -417,7 +424,8 @@ ReadVizgen_opt <-
 
 #==========================================================================
 LoadVizgen_opt <- 
-  function (data.dir, fov = "vz", assay = "Vizgen", Update.object = TRUE,
+  function (data.dir, fov = "vz", assay = "Vizgen", 
+            add.zIndex = TRUE, Update.object = TRUE,
             ...)
   {
     data <- ReadVizgen_opt(data.dir = data.dir, ...)
@@ -445,6 +453,9 @@ LoadVizgen_opt <-
                                          y = Cells(x = obj)))    
     }
     
+    # add z-stack index for cells
+    if (add.zIndex) { obj$z <- data$zIndex$z }
+   
     # add metadata vars
     if (c("metadata" %in% names(data))) {
       metadata <- match.arg(arg = "metadata", choices = names(data), several.ok = TRUE)
