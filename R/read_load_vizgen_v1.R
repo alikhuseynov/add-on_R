@@ -82,10 +82,16 @@ ReadVizgen_opt <-
     }
     
     # use Cellpose output
-    if (use.cellpose.out && any("Cellpose" == list.files(data.dir))) {
+    if (use.cellpose.out && grep("Cellpose", list.files(data.dir)) %>% any) {
       message("Cellpose output will be used..")
-      files <- c(transcripts = transcripts %||% "./Cellpose/cellpose_cell_by_gene.csv",
-                 spatial = spatial %||% "./Cellpose/cellpose_cell_metadata.csv",
+      files <- c(transcripts = transcripts %||% paste0(data.dir, 
+           paste0("/", list.files(data.dir, pattern = "Cellpose"), 
+                  "/cellpose_cell_by_gene.csv")),
+                 
+                 spatial = spatial %||% paste0(data.dir, 
+           paste0("/", list.files(data.dir, pattern = "Cellpose"), 
+                  "/cellpose_cell_metadata.csv")),
+                 
                  molecules = molecules %||% "detected_transcripts[_a-zA-Z0-9]*.csv")
     } else { 
       files <- c(transcripts = transcripts %||% "cell_by_gene[_a-zA-Z0-9]*.csv",
@@ -269,6 +275,7 @@ ReadVizgen_opt <-
                        names(segs) <- filter(parq, ZIndex == z) %>% pull(EntityID) %>% as.character       
                        
                        # TODO: (optionally) resample & make cell boundaries equidistant!
+                                
                        # extract cell boundaries per cells
                        segs_list <-
                          mclapply(segs %>% seq,  
@@ -481,4 +488,3 @@ LoadVizgen_opt <-
     
     gc() %>% invisible()
   }
-
