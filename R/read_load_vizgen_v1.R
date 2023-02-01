@@ -276,15 +276,28 @@ ReadVizgen_opt <-
                        
                        # TODO: (optionally) resample & make cell boundaries equidistant!
                                 
+                       if (!is.null(mc.cores.portion)) {
+                           # extract cell boundaries per cells (faster)
+                           segs_list <-
+                           mclapply(segs %>% seq,
+                                    function(i) {
+                                        segs[[i]][[1]] %>% 
+                                            as.data.frame.list %>%
+                                            mutate(cell = names(segs)[i]) },
+                                    mc.cores = round(mc.cores.total / mc.cores.portion) # use some portion of total mc.cores
+                                   )
+                       } else {
                        # extract cell boundaries per cells
                        segs_list <-
-                         mclapply(segs %>% seq,  
-                                  function(i) { 
-                                    segs[[i]][[1]] %>% 
-                                      as.data.frame.list %>% 
-                                      mutate(cell = names(segs)[i]) }, 
-                                  mc.cores = round(mc.cores.total / mc.cores.portion) # use some portion of total mc.cores
-                         )
+                           lapply(segs %>% seq,
+                                  function(i) {
+                                      segs[[i]][[1]] %>%
+                                          as.data.frame.list %>% 
+                                          mutate(cell = names(segs)[i])
+                                  }
+                                 )
+                       }
+                                
                        #segs_list %>% length
                        # df of all cell segmentations
                        segs <- do.call("rbind", segs_list)
@@ -488,3 +501,4 @@ LoadVizgen_opt <-
     
     gc() %>% invisible()
   }
+
