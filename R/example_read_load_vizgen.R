@@ -98,19 +98,16 @@ handlers("progress")
 with_progress(
   data <- ReadVizgen_opt(data.dir = dir_use,
                          use.cellpose.out = TRUE, # if TRUE and ./Cellpose dir exists
-                         #transcripts = "./Cellpose/cellpose_cell_by_gene.csv", # count matrix
-                         #molecules = "./detected_transcripts.csv", # molecule spatial coord matrices
-                         #spatial = "./Cellpose/cellpose_cell_metadata.csv", # cell spatial coord matrices
                          #filter = "^Blank-", # filter gene names starting with specific pattern
                          metadata = c("volume", "fov"), # add cell volume info
                          mol.type = mol.type, # molecule coords in µm space
                          coord.space = coord.space, 
                          type = c("segmentations", "centroids", "boxes"), # type of cell spatial coord matrices
-                         z = z.stack, 
-                         use.parallel = TRUE, mc.cores.total = 20, # for `parallel` processing 
+                         z = z.stack,
+                         use.parallel = TRUE, mc.cores.total = 18, # for `parallel` processing 
                          mc.cores.portion = 2, # denominator for `mc.cores.total`, ie `mc.cores.total / mc.cores.portion` for faster extraction of cell boundaries
                          DTthreads.pct = NULL # percentage of total threads to use for `data.table::fread`
-  )
+                        )
 )
 data %>% str
 
@@ -150,24 +147,22 @@ message("Creating/Loading object(s): ", "\n",
 # renders progress of function
 with_progress(
   obj <- 
-    LoadVizgen_opt(data.dir = dir_use,
-                   fov = fov, 
-                   assay = assay.name,
-                   use.cellpose.out = TRUE, # if TRUE and ./Cellpose dir exists
-                   #transcripts = "./Cellpose/cellpose_cell_by_gene.csv", # count matrix
-                   #molecules = "./detected_transcripts.csv", # molecule spatial coord matrices
-                   #spatial = "./Cellpose/cellpose_cell_metadata.csv", # cell spatial coord matrices
-                   #filter = "^Blank-", # filter gene names starting with specific pattern
-                   metadata = c("volume", "fov"), # add cell volume info
-                   mol.type = mol.type, # molecule coords in µm space
-                   coord.space = coord.space, 
-                   type = c("segmentations", "centroids", "boxes"), # type of cell spatial coord matrices
-                   z = z.stack,
-                   Update.object = TRUE,
-                   use.parallel = TRUE, mc.cores.total = 24, # for `parallel` processing 
-                   mc.cores.portion = 2,
-                   DTthreads.pct = NULL # percentage of total threads to use for `data.table::fread`
-    )
+     LoadVizgen_opt(data.dir = dir_use,
+                    fov = fov, 
+                    assay = "Vizgen",
+                    use.cellpose.out = TRUE, # if TRUE and ./Cellpose dir exists
+                    #filter = "^Blank-", # filter gene names starting with specific pattern
+                    metadata = c("volume", "fov"), # add cell volume info
+                    mol.type = mol.type, # molecule coords in µm space
+                    coord.space = coord.space, 
+                    type = c("segmentations", "centroids", "boxes"), # type of cell spatial coord matrices
+                    z = z.stack,
+                    add.zIndex = TRUE, # add z slice section to a cell
+                    Update.object = TRUE,
+                    use.parallel = TRUE, mc.cores.total = 18, # for `parallel` processing 
+                    mc.cores.portion = 2, # denominator for `mc.cores.total`, ie `mc.cores.total / mc.cores.portion` for faster extraction of cell boundaries
+                    DTthreads.pct = NULL # percentage of total threads to use for `data.table::fread`
+                   )
 )
 
 end.time <- Sys.time()
