@@ -7,7 +7,7 @@ NULL
 #' New arguments:
 #' @param use.parallel If to use \code{parallel::mclapply()}, default is \code{TRUE}, if \code{FALSE}, uses \code{future} library
 #' @param mc.cores.total Number of cores to use for \code{parallel::mclapply()}, check cores with \code{parallel::detectCores()}
-#' @param mc.cores.portion Denominator for \code{mc.cores.total}, ie \code{mc.cores.total / mc.cores.portion} used for faster extraction of cell boundaries per cell..
+#' @param mc.cores.portion Denominator for \code{mc.cores.total}, ie \code{mc.cores.total / mc.cores.portion} used for faster extraction of cell boundaries per cell. If set to \code{NULL}, parallelization will not be used.
 #' @param DTthreads.pct Set percentage eg \code{50} of total threads to use for \code{data.table::fread}, if set to \code{NULL} will use default setting as in \code{data.table::getDTthreads(verbose = T)}
 #' @param mol.type.use In which space to use molecules coords: "microns" or "pixels". Default to "microns". This arg is for creating an object \code{LoadVizgen_opt()}
 #' @param coord.space = "micron" Which coordinate space to use: "microns" or "mosaic" (pixel space). Default to "microns"
@@ -45,9 +45,10 @@ ReadVizgen_opt <-
         mc.cores.total <- quantile(parallel::detectCores() %>% seq)[4] %>% round
         message(mc.cores.total, " of total cores available will be used")
       } else { message("Setting total cores to: ", mc.cores.total) }   
-    } else { message("Using parallelization with: `future`") }
-    
-    
+    } else { message("Using parallelization with: `future`", "\n",
+                     "NOTE: set workers for parallelization, eg: `future::plan('multisession', workers = 10)`")  
+           }
+      
     # setting cores to use for parallel computing - `data.table`
     if (!is.null(DTthreads.pct)) {
       message("Using parallelization with: `data.table`", "\n",
@@ -278,6 +279,7 @@ ReadVizgen_opt <-
                                 
                        if (!is.null(mc.cores.portion)) {
                            # extract cell boundaries per cells (faster)
+                           message("Using fast extraction of cell boundaries..")  
                            segs_list <-
                            mclapply(segs %>% seq,
                                     function(i) {
@@ -501,4 +503,3 @@ LoadVizgen_opt <-
     
     gc() %>% invisible()
   }
-
