@@ -33,15 +33,16 @@ ReadVizgen_opt <-
     
   {   
     if (!requireNamespace("data.table", quietly = TRUE)) {
-      stop("Please install 'data.table' for this function")
+      stop("Please install 'data.table' for this function", call. = FALSE)
     }
       
     if (!requireNamespace("BiocParallel", quietly = TRUE)) {
-      stop("Please install 'BiocParallel' for parallelization")
+      stop("Please install 'BiocParallel' for parallelization", call. = FALSE)
     }
     
     if (!requireNamespace("sfarrow", quietly = TRUE)) {
-      stop("Please install 'sfarrow' for reading cell boundaries from `.parquet` files ")
+      stop("Please install 'sfarrow' for reading cell boundaries from `.parquet` files ",
+		   call. = FALSE)
     }
 
     # setting workers to use for parallel computing - `parallel`
