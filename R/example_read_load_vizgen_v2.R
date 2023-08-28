@@ -8,7 +8,7 @@ suppressPackageStartupMessages({
   library(magrittr)
   library(BiocParallel)
   library(progressr)
-  library(spatstat)  
+  library(sf)
 })
 
 # helper function to return Seurat object metadata
@@ -32,6 +32,8 @@ obj <-
              update.object = TRUE,
              use.BiocParallel = TRUE,
              workers.MulticoreParam = 14, # for `BiocParallel` processing
+             min.area = 5, # minimal polygon area to use as a threshold for filtering segmentaion geometries
+             add.molecules = TRUE, # if to add "molecules" coordinates to FOV of the object
              verbose = TRUE
              )
 end.time <- Sys.time()
