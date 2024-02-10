@@ -1,0 +1,131 @@
+#' Custom Crop function to remove any tissue area
+#' @param x A data.frame with \code{x}, \code{y} and eg \code{cell} (cell barcode or ID) variable
+#' @param object A \code{Seurat} object. NOTE, currently works on object with single FOV only. 
+#' @param col_id A \code{character} vector specifing which variable has the cell ids
+#' @param xy_pts A data.frame of xy point coordinates, must have 3 or more xy points.
+#'  This will generate a convex hull for cropping
+#' @param c_hull_include Everything under (\code{TRUE}) convex hull polygon is included or cropped out (\code{FALSE})
+#' @param crop_molecules When \code{Seurat} is present, if to crop molecule cooridnates
+#'  NOTE, this can take time especially when there are many molecules.
+#' @param BPPARAM description
+#' @return Returns cropped data.frame with same variables as input.
+#'  Or cropped \code{Seurat} object.
+#' @import sf
+#' @import BiocParallel
+#' @import SeuratObject
+#' @importFrom magrittr %>% %<>%
+#' @importFrom dplyr filter pull transmute
+#'
+Crop_custom <- 
+  function(x = NULL, 
+           object = NULL,
+           col_id = c("cell"),
+           xy_pts = NULL,
+           c_hull_include = TRUE,
+           crop_molecules = TRUE,
+           BPPARAM = BiocParallel::SerialParam()) {
+    
+    # check packages
+    pkgs <- c("data.table", "sf", "BiocParallel", 
+              "tidyverse", "magrittr")
+    lapply(pkgs %>% seq(), function(i)
+    { !requireNamespace(pkgs[i], quietly = TRUE) } ) %>% 
+      unlist() %>% 
+      { if (c(which(.) > 0) %>% any()) 
+      { c("Please install ->", "\n",
+          paste0("'", pkgs[which(.)], "'", collapse = ", "), " for this function") %>% 
+          stop(., call. = FALSE) } }
+    
+    # check inputs
+    if (is.null(xy_pts)) {
+      stop(">>> Please provide xy point coordinates in `xy_pts`")
+    }
+    
+    if (!is.null(object)) {
+      if (is(object, "Seurat")) {
+        message(">>> Using `Seurat` object")
+        x <- NULL
+        df_xy <- object[[Images(object)[1]]] %>% GetTissueCoordinates()
+      }
+    } else if (!is.null(x)) {
+      # check x
+      is_x <- 
+        grep("data.frame|data.table|tibble|matix", 
+             class(x)) %>% any()
+      if (is_x) { 
+        df_xy <- x 
+        object <- NULL
+      }
+    } else if (is.null(object) && is.null(x)) {
+      stop(">>> Please provide either `object` or `x` data.frame")
+    }
+    
+    # make sf data.frame
+    sf_df <- st_as_sf(df_xy, coords = c("x", "y"))
+    # make convex hull
+    c_hull <- 
+      st_as_sf(xy_pts, coords = c("x", "y")) %>% 
+      st_combine() %>% st_convex_hull()
+    crop_df <-
+      st_intersection(sf_df, c_hull)
+    
+    # subset data.frame given the cell ids
+    # use col_id instead of $cell
+    df_xy %<>% {
+      if (c_hull_include) { 
+        filter(., !!as.symbol(col_id) %in% pull(crop_df, col_id))
+      } else {
+        filter(., !(!!as.symbol(col_id)) %in% pull(crop_df, col_id))
+      }
+    }
+    
+    # output data.frame
+    if (is.null(object) && !is.null(x)) {
+      message(">>> Return output: `data.frame`")
+      return(df_xy) }
+    
+    # cropping Seurat object ----
+    # output Seurat
+    if (!is.null(object)) {
+      message(">>> Return output - `Seurat` object")
+      # subset object, centroids and segmentations as well
+      object %<>%
+        subset(x = ., 
+               cells = intersect(x = colnames(x = .),
+                                 y =  pull(df_xy, col_id)))
+      
+      # crop molecules ----
+      fov <- object[[Images(object)[1]]]
+      if (crop_molecules && 
+          grep("molecules", names(fov)) != 0) {
+        message(">>> Cropping molecule coordinates - might take time!")
+        # using previously made convex hull
+        sf_df_mols <- st_as_sf(fov[["molecule"]] %>% GetTissueCoordinates(), 
+                               coords = c("x", "y"))
+        if (c_hull_include) {
+          mols <- st_intersection(sf_df_mols, c_hull)
+        } else {
+          mols <- st_difference(sf_df_mols, c_hull)
+        }
+        genes <- mols$molecule %>% unique()
+        mols <-
+          bplapply(genes %>% seq(), function(i) {
+            mols %>%
+              filter(molecule == genes[i]) %>%
+              st_geometry() %>%
+              st_coordinates() %>%
+              as.data.frame() %>%
+              transmute(x = X, y = Y, 
+                        gene = genes[i])
+          }, BPPARAM = BPPARAM)
+        # Create Molecule FOV only
+        mols %<>% 
+          data.table::rbindlist() %>%
+          CreateMolecules()
+        # replace and add to FOV of the object
+        object[[Images(object)[1]]][["molecule"]] <- mols
+      }
+      object %<>% UpdateSeuratObject()
+      return(object)
+    }
+  }
