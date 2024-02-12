@@ -15,6 +15,23 @@
 #' @import SeuratObject
 #' @importFrom magrittr %>% %<>%
 #' @importFrom dplyr filter pull transmute
+#' @examples
+#' # NOTE, `sf` package must be installed!
+#' # provide xy coords to make convex hull polygon
+#' xy_pts <- 
+#' data.frame("x" = c(5400, 11000, 5400, 6100, 7500, 11000),
+#' "y" = c(0, 0, 1500, 2000, 4100, 4100))
+#' # run crop function on Seurat object (image-based spatial object, like Xenium, Vizgen, etc..)
+#' obj_crop <- 
+#' Crop_custom(object = seurat_object, col_id = c("cell"), xy_pts = xy_pts,
+#' c_hull_include = TRUE,
+#' crop_molecules = TRUE,
+#' BPPARAM = BiocParallel::MulticoreParam(5, tasks = 10L,force.GC = FALSE, progressbar = TRUE))
+#' # run crop function on any dataframe that contains xy coords
+#' df_crop <- 
+#' Crop_custom(x = df_mols, col_id = c("molecule"), xy_pts = xy_pts,
+#' c_hull_include = TRUE,
+#' BPPARAM = BiocParallel::MulticoreParam(5, tasks = 10L,force.GC = FALSE, progressbar = TRUE))
 #'
 Crop_custom <- 
   function(x = NULL, 
