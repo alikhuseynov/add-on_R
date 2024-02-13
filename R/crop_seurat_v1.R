@@ -2,8 +2,8 @@
 #' @param x A data.frame with \code{x}, \code{y} and eg \code{cell} (cell barcode or ID) variable
 #' @param object A \code{Seurat} object. NOTE, currently works on object with single FOV only. 
 #' @param col_id A \code{character} vector specifing which variable has the cell ids
-#' @param xy_pts A data.frame of xy point coordinates, must have 3 or more xy points.
-#'  This will generate a convex hull for cropping
+#' @param xy_pts A data.frame of xy point coordinates, must have 3 or more xy points, 
+#'  it can also be a list of data frames. This will generate a convex hull for cropping
 #' @param c_hull_include Everything under (\code{TRUE}) convex hull polygon is included or cropped out (\code{FALSE})
 #' @param crop_molecules When \code{Seurat} is present, if to crop molecule cooridnates
 #'  NOTE, this can take time especially when there are many molecules.
@@ -66,9 +66,11 @@ Crop_custom <-
       }
     } else if (!is.null(x)) {
       # check x
-      is_x <- 
-        grep("data.frame|data.table|tibble|matix", 
-             class(x)) %>% any()
+      is_x <-
+      inherits(x = x, 
+               what = c("data.frame", "data.table", "tibble", "matrix"))
+      #grep("data.frame|data.table|tibble|matrix", 
+      #       class(x)) %>% any()
       if (is_x) { 
         df_xy <- x 
         object <- NULL
@@ -80,6 +82,9 @@ Crop_custom <-
     # make sf data.frame
     sf_df <- st_as_sf(df_xy, coords = c("x", "y"))
     # make convex hull
+    if (is(xy_pts, "list")) {
+      xy_pts <- data.table::rbindlist(xy_pts)
+    }
     c_hull <- 
       st_as_sf(xy_pts, coords = c("x", "y")) %>% 
       st_combine() %>% st_convex_hull()
@@ -120,10 +125,21 @@ Crop_custom <-
         sf_df_mols <- st_as_sf(fov[["molecule"]] %>% GetTissueCoordinates(), 
                                coords = c("x", "y"))
         if (c_hull_include) {
-          mols <- st_intersection(sf_df_mols, c_hull)
+          #mols <- st_intersection(sf_df_mols, c_hull)
+          # faster with `st_join`
+          mols <-
+            st_join(x = sf_df_mols, 
+                    join = st_within, 
+                    left = FALSE,
+                    y = st_sf(geometry = c_hull))
         } else {
-          mols <- st_difference(sf_df_mols, c_hull)
-        }
+          #mols <- st_difference(sf_df_mols, c_hull)
+          mols <-
+            st_join(x = sf_df_mols, 
+                    join = st_disjoint,
+                    left = FALSE,
+                    y = st_sf(geometry = c_hull))
+          }
         genes <- mols$molecule %>% unique()
         mols <-
           bplapply(genes %>% seq(), function(i) {
@@ -142,7 +158,7 @@ Crop_custom <-
         # replace and add to FOV of the object
         object[[Images(object)[1]]][["molecule"]] <- mols
       }
-      object %<>% UpdateSeuratObject()
+      validObject(object = object)
       return(object)
     }
   }
