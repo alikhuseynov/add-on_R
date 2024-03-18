@@ -72,7 +72,7 @@ Crop_custom <-
       #grep("data.frame|data.table|tibble|matrix", 
       #       class(x)) %>% any()
       if (is_x) { 
-        df_xy <- x 
+        df_xy <- x
         object <- NULL
       }
     } else if (is.null(object) && is.null(x)) {
@@ -101,11 +101,47 @@ Crop_custom <-
       }
     }
     
-    # output data.frame
+    # TODO make more cleaner code for cropping df ----
+    # output data.frame ----
     if (is.null(object) && !is.null(x)) {
+      message(">>> Cropping `data.frame`")
+      if (c_hull_include) {
+        # faster with `st_join`
+        mols <-
+          st_join(x = sf_df, 
+                  join = st_within, 
+                  left = FALSE,
+                  y = st_sf(geometry = c_hull))
+      } else {
+        #mols <- st_difference(sf_df, c_hull)
+        mols <-
+          st_join(x = sf_df, 
+                  join = st_disjoint,
+                  left = FALSE,
+                  y = st_sf(geometry = c_hull))
+      }
+      
+      genes <- mols %>% pull(col_id) %>% unique()
+      mols <-
+        bplapply(genes %>% seq(), function(i) {
+          mols %>%
+            
+            # TODO: use col_id instead of molecule, eg !!as.symbol(col_id)
+            filter(molecule == genes[i]) %>%
+            st_geometry() %>%
+            st_coordinates() %>%
+            as.data.frame() %>%
+            transmute(x = X, y = Y, 
+                      molecule = genes[i])
+        }, BPPARAM = BPPARAM) %>%
+        data.table::rbindlist()
       message(">>> Return output: `data.frame`")
-      return(df_xy) }
+      if (crop_molecules) {
+        return(mols)
+      } else { return(df_xy) }
+    }
     
+  
     # cropping Seurat object ----
     # output Seurat
     if (!is.null(object)) {
@@ -157,6 +193,13 @@ Crop_custom <-
           CreateMolecules()
         # replace and add to FOV of the object
         object[[Images(object)[1]]][["molecule"]] <- mols
+        
+        # TODO: make sure that cropped mols are added to object? ----
+        #..and no mols are present in cropped out regions, since few mols were still present.
+        # test with GetTissueCoordinates() and plot them!
+        
+        
+        
       }
       validObject(object = object)
       return(object)
